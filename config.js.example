@@ -1,0 +1,18 @@
+const { convertColor } = require("./utils/scripts");
+require("dotenv").config();
+
+const config = {
+  client: {
+    token: process.env.token || "OqweLJHsdok.asd_Wewjqhrkqos", 
+    ID: "23543254363565",
+  },
+  colors: {
+    main: convertColor(0xfffff),
+    error: convertColor(0xffff),
+  },
+  misc: {
+    developers: ["1232143252435", "123124325243"], 
+  },
+};
+
+module.exports = { config };

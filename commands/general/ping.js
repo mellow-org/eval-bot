@@ -1,116 +1,125 @@
-const { SlashCommandBuilder, ChatInputCommandInteraction, ComponentType } = require("discord.js");
+const { SlashCommandBuilder, ChatInputCommandInteraction } = require("discord.js");
+const { config } = require("../../config");
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName("ping")
-    .setDescription("Get Lucy's latency information"),
+    data: new SlashCommandBuilder()
+        .setName("ping")
+        .setDescription("Get some latency information"),
+
     /**
-   * @param {ChatInputCommandInteraction} ctx
-   */
-  async execute(ctx) {
-    const timestamp = new Date();
+     * Executes the ping command.
+     *
+     * @function
+     * @param {ChatInputCommandInteraction} ctx - The interaction.
+     * @returns {Promise<void>}
+     */
+    async execute(ctx) {
+        const timestamp = new Date();
 
-    const getApiLatency = () => {
-      return ctx.client.ws.ping;
-    };
+        /**
+         * Retrieves the API latency.
+         * @returns {number} The API latency in milliseconds.
+         */
+        const getApiLatency = () => {
+            return ctx.client.ws.ping;
+        };
 
-    let components = [
-      {
-        type: ComponentType.ActionRow,
-        components: [
-          {
-            type: ComponentType.Button,
-            style: 1,
-            label: "Refresh",
-            customId: "refresh_ping",
-          },
-          {
-            type: ComponentType.Button,
-            style: 5,
-            label: "Repository",
-            url: "https://github.com/mellow-org/eval-bot",
-          },
-          {
-            type: ComponentType.Button,
-            style: 5,
-            label: "Developer",
-            url: "https://github.com/mellow-org", 
-          },
-        ],
-      },
-    ];
-
-    const initialApiLatency = getApiLatency(); // Get the initial API latency
-
-    await ctx.reply({
-      embeds: [
-        {
-          title: "Pong!",
-          fields: [
+        let components = [
             {
-              name: "API Latency",
-              value: `${initialApiLatency}ms`,
-              inline: true,
+                type: 1,
+                components: [
+                    {
+                        type: 2,
+                        style: 1,
+                        label: "Refresh",
+                        customId: "refresh_ping",
+                    },
+                    {
+                        type: 2,
+                        style: 5,
+                        label: "Repository",
+                        url: "https://github.com/mellow-org/eval-bot",
+                    },
+                    {
+                        type: 2,
+                        style: 5,
+                        label: "Developer",
+                        url: "https://github.com/mellow-org",
+                    },
+                ],
             },
-            {
-              name: "Bot Response Time",
-              value: `${Date.now() - ctx.createdTimestamp}ms`,
-              inline: true,
-            },
-          ],
-          color: 0xCCFCFC,
-          timestamp: timestamp.toISOString(),
-          footer: {
-            text: `Powered by @${ctx.client.user.username}`,
-            icon_url: ctx.client.user.avatarURL(),
-          },
-        },
-      ],
-      components,
-    });
+        ];
 
-    const filter = (interaction) => interaction.customId === "refresh_ping" && interaction.user.id === ctx.user.id;
-    const collector = ctx.channel.createMessageComponentCollector({ filter, time: 15000 });
+        const initialApiLatency = getApiLatency();
 
-    collector.on("collect", async (interaction) => {
-      const updatedApiLatency = getApiLatency(); // Get the updated API latency
-      await interaction.update({
-        embeds: [
-          {
-            title: "Pong!",
-            fields: [
-              {
-                name: "API Latency",
-                value: `${updatedApiLatency}ms`,
-                inline: true,
-              },
-              {
-                name: "Bot Response Time",
-                value: `${Date.now() - interaction.createdTimestamp}ms`,
-                inline: true,
-              },
+        await ctx.reply({
+            embeds: [
+                {
+                    title: "Pong!",
+                    fields: [
+                        {
+                            name: "API Latency",
+                            value: `${initialApiLatency}ms`,
+                            inline: true,
+                        },
+                        {
+                            name: "Bot Response Time",
+                            value: `${Date.now() - ctx.createdTimestamp}ms`,
+                            inline: true,
+                        },
+                    ],
+                    color: config.colors.main,
+                    timestamp: timestamp.toISOString(),
+                    footer: {
+                        text: `Powered by @${ctx.client.user.username}`,
+                        icon_url: ctx.client.user.avatarURL(),
+                    },
+                },
             ],
-            color: 0xCCFCFC,
-            timestamp: timestamp.toISOString(),
-            footer: {
-              text: `Powered by @${ctx.client.user.username}`,
-              icon_url: ctx.client.user.avatarURL(),
-            },
-          },
-        ],
-      });
-    });
+            components,
+            ephemeral: true,
+        });
 
-    collector.on("end", (collected) => {
-      // Disable the buttons after the collector ends
-      components[0].components[0].disabled = true; // Disable Refresh button
-      components[0].components[1].disabled = true; // Disable Repository button
-      components[0].components[2].disabled = true; // Disable Developer button
+        const filter = (interaction) => interaction.customId === "refresh_ping" && interaction.user.id === ctx.user.id;
+        const collector = ctx.channel.createMessageComponentCollector({ filter, time: 15000 });
 
-      ctx.editReply({
-        components,
-      });
-    });
-  },
+        collector.on("collect", async (interaction) => {
+            const updatedApiLatency = getApiLatency();
+            await interaction.update({
+                embeds: [
+                    {
+                        title: "Pong!",
+                        fields: [
+                            {
+                                name: "API Latency",
+                                value: `${updatedApiLatency}ms`,
+                                inline: true,
+                            },
+                            {
+                                name: "Bot Response Time",
+                                value: `${Date.now() - interaction.createdTimestamp}ms`,
+                                inline: true,
+                            },
+                        ],
+                        color: config.colors.main,
+                        timestamp: timestamp.toISOString(),
+                        footer: {
+                            text: `Powered by @${ctx.client.user.username}`,
+                            icon_url: ctx.client.user.avatarURL(),
+                        },
+                    },
+                ],
+            });
+        });
+
+        collector.on("end", (collected) => {
+            components[0].components[0].disabled = true;
+            components[0].components[1].disabled = true;
+            components[0].components[2].disabled = true;
+
+            ctx.editReply({
+                components,
+            });
+        });
+    },
 };
-
