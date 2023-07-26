@@ -2,10 +2,16 @@ const {
     SlashCommandBuilder,
     AttachmentBuilder,
     codeBlock,
-    ChatInputCommandInteraction
+    ChatInputCommandInteraction,
+    Component
 } = require("discord.js");
 const { inspect } = require("util");
-const { disableComponents } = require("../../functions");
+const { config } = require("../../config");
+
+/**
+ * @author mellow-org
+ * @since 1.0.0
+ */
 
 module.exports = {
     category: "developer",
@@ -14,30 +20,42 @@ module.exports = {
         .setName("eval")
         .setDescription("Evaluates arbitrary JavaScript code.")
         .addStringOption((option) =>
-            option.setName("code").setDescription("The JavaScript code to evaluate.")
+            option
+                .setName("code")
+                .setDescription("The JavaScript code to evaluate.")
+                .setRequired(true)
+        )
+        .addBooleanOption((option) =>
+            option
+                .setName("ephemeral")
+                .setDescription("Whether the reply should be ephemeral or not, defaults to true.")
         ),
+
     /**
-     * 
-     * @param {ChatInputCommandInteraction} ctx 
-     * @returns 
+     * Executes the eval command.
+     *
+     * @function
+     * @param {ChatInputCommandInteraction} ctx - The interaction.
+     * @returns {Promise<void>}
      */
     async execute(ctx) {
         const code = ctx.options.getString("code");
-
-        if (!code) {
-            return ctx.reply({
-                content: "Please provide some code to evaluate!",
-                ephemeral: true,
-            });
-        }
+        const ephemeralOption = ctx.options.getBoolean("ephemeral") ?? true;
 
         try {
             const { guild, channel, user, member, client } = ctx;
 
             let evaled = await eval(code);
             let string = inspect(evaled);
+            string = string.replace(client.token, "<Client.token>");
             let page = 0;
 
+            /**
+             * Divides a string into parts of a specified length.
+             * @param {string} str - The input string.
+             * @param {number} len - The maximum length of each part.
+             * @returns {string[]} An array of string parts.
+             */
             function getParts(str, len) {
                 const res = [];
                 while (str.length) {
@@ -50,7 +68,7 @@ module.exports = {
             const descrip = getParts(string, 2040);
             const embe = {
                 title: "Code Evaluation",
-                color: 0xf0c8d8,
+                color: config.colors.main,
                 timestamp: new Date().toISOString(),
             };
 
@@ -69,7 +87,7 @@ module.exports = {
                         {
                             type: 2,
                             style: 3,
-                            label: "Prev",
+                            label: "Backward",
                             custom_id: "prev",
                         },
                         {
@@ -81,7 +99,7 @@ module.exports = {
                         {
                             type: 2,
                             style: 3,
-                            label: "Next",
+                            label: "Forward",
                             custom_id: "next",
                         },
                         {
@@ -92,8 +110,20 @@ module.exports = {
                         },
                     ],
                 };
-
+                
                 let utilbuttons = {
+                    "type": 1,
+                    "components": [
+                        {
+                            "type": 2,
+                            "style": 2,
+                            "label": "Download",
+                            "custom_id": "download_menu"
+                        }
+                    ]
+                }
+
+                let downloadbuttons = {
                     type: 1,
                     components: [
                         {
@@ -116,10 +146,11 @@ module.exports = {
                         },
                     ],
                 };
+
                 const msg = await ctx.reply({
                     embeds: [embe],
                     components: [row, utilbuttons],
-                    ephemeral: true,
+                    ephemeral: ephemeralOption,
                 });
 
                 const collector = msg.createMessageComponentCollector({
@@ -148,18 +179,23 @@ module.exports = {
                             break;
                         case "ffff":
                             collector.resetTimer();
-                            embe.description = `\`\`\`js\n${descrip[0]}\`\`\``;
+                            page = 0;
+                            embe.description = `\`\`\`js\n${descrip[page]}\`\`\``;
                             embe.footer = { text: `Page 1 of ${descrip.length}` };
                             msg.edit({ embeds: [embe], components: [row, utilbuttons] });
                             break;
                         case "last":
                             collector.resetTimer();
-                            embe.description = `\`\`\`js\n${descrip[descrip.length - 1]
-                                }\`\`\``;
+                            page = descrip.length - 1;
+                            embe.description = `\`\`\`js\n${descrip[page]}\`\`\``;
                             embe.footer = {
                                 text: `Page ${descrip.length} of ${descrip.length}`,
                             };
                             msg.edit({ embeds: [embe], components: [row, utilbuttons] });
+                            break;
+                        case "download_menu":
+                            collector.resetTimer();
+                            ctx.followUp({ content: " ", components: [downloadbuttons], ephemeral: true });
                             break;
                         case "downloadpage":
                             collector.resetTimer();
@@ -179,15 +215,15 @@ module.exports = {
                             break;
                         case "viewallpages":
                             collector.resetTimer();
-                            descrip.forEach(async (page, index) => {
+                            for (let index = 0; index < descrip.length; index++) {
                                 const pageEmbed = {
                                     title: `Page ${index + 1} of ${descrip.length}`,
-                                    description: codeBlock("js", page),
-                                    color: 0xf0c8d8,
+                                    description: codeBlock("js", descrip[index]),
+                                    color: config.colors.main,
                                     timestamp: new Date().toISOString(),
                                 };
                                 await ctx.followUp({ embeds: [pageEmbed], ephemeral: true });
-                            });
+                            }
                             break;
                         default:
                             collector.stop();
@@ -196,16 +232,17 @@ module.exports = {
                                 .catch(() => { });
                     }
                 });
+
                 collector.on("end", async (x) => {
                     row.components = row.components.map((c) => ({ ...c, disabled: true }));
                     utilbuttons.components = utilbuttons.components.map((c) => ({ ...c, disabled: true }));
-                    msg.edit({ components: [row, utilbuttons] }).catch(() => {});
+                    msg.edit({ components: [row, utilbuttons] }).catch(() => { });
                 });
             } else {
                 embe.description = `\`\`\`js\n${descrip[0]}\`\`\``;
                 ctx.reply({
                     embeds: [embe],
-                    ephemeral: true,
+                    ephemeral: ephemeralOption,
                 });
             }
         } catch (err) {
@@ -219,12 +256,12 @@ module.exports = {
             if (ctx.replied || ctx.deferred) {
                 await ctx.followUp({
                     content: `\`\`\`\js\n${err}\n\`\`\``,
-                    ephemeral: true,
+                    ephemeral: ephemeralOption,
                 });
             } else {
                 await ctx.reply({
                     content: `\`\`\`\js\n${err}\n\`\`\``,
-                    ephemeral: true,
+                    ephemeral: ephemeralOption,
                 });
             }
         }

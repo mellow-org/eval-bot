@@ -2,7 +2,9 @@ require("dotenv").config();
 const { Client, Collection, GatewayIntentBits, ActivityType } = require("discord.js");
 const fs = require("fs").promises;
 const path = require("path");
-const winston = require("winston");
+
+const { config } = require("./config");
+const { convertColor,findCommandFile, fileExists, logger } = require("./utils/scripts");
 
 const client = new Client({
   intents: [
@@ -14,30 +16,18 @@ const client = new Client({
     status: "idle",
     activities: [
       {
-        name: "Cyberpunk 2077",
+        name: "Games",
         type: ActivityType.Playing,
       },
     ],
   },
 });
 
-// Create a logger
-const logger = winston.createLogger({
-  level: "info",
-  format: winston.format.combine(
-    winston.format.colorize(),
-    winston.format.timestamp({
-      format: "YYYY-MM-DD HH:mm:ss"
-    }),
-    winston.format.printf(({ timestamp, level, message }) => {
-      return `[${timestamp}] [${level}]: ${message}`;
-    })
-  ),
-  transports: [new winston.transports.Console()],
-});
 
 client.commands = new Collection();
 client.logger = logger;
+client.config = config;
+client.utils = { convertColor, findCommandFile, fileExists, logger };
 
 async function loadCommands() {
   const foldersPath = path.join(__dirname, "commands");
@@ -93,7 +83,7 @@ async function loadEvents() {
 
 (async () => {
   try {
-    if (!process.env.token) {
+    if (!config.client.token) {
       logger.error("No bot token provided in the environment variables.");
       return;
     }
@@ -101,7 +91,7 @@ async function loadEvents() {
     await loadCommands();
     await loadEvents();
 
-    await client.login(process.env.token);
+    await client.login(config.client.token);
   } catch (error) {
     logger.error("Error during initialization:", error);
   }
